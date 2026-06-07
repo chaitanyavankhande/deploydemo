@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------
+  # SERVICE 1: The Database
+  # ----------------------------------------------------
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-db
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: deploydemo
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------
+  # SERVICE 2: The Spring Boot Application
+  # ----------------------------------------------------
+  spring-app:
+    # Instead of pulling an image from the internet, we tell Docker Compose to 
+    # read our local Dockerfile and build the image for us automatically!
+    build: .
+    container_name: spring-app
+    
+    # INDUSTRY STANDARD: We use a profile to "hide" this container by default.
+    # This prevents the container from stealing Port 8080 when you hit the 
+    # "Run" button inside IntelliJ!
+    profiles: ["docker-test"]
+    
+    ports:
+      - "8080:8080"
+    environment:
+      # Notice we use the container name 'mysql-db' to talk across the street!
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/deploydemo
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpassword
+    depends_on:
+      # This prevents Spring Boot from starting before MySQL is completely ready
+      mysql-db:
+        condition: service_healthy
+
+# Define the persistent volume for MySQL data
+volumes:
+  mysql-data:
